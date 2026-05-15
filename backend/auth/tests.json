@@ -1,0 +1,41 @@
+{
+  "tests": [
+    {
+      "name": "Register new user",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "register",
+        "email": "test_biznes_auto@example.com",
+        "password": "password123",
+        "full_name": "Тест Пользователь",
+        "company": "ООО Тест"
+      },
+      "expectedStatus": 200,
+      "expectedBody": { "token": "string" },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Login with wrong password",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "login",
+        "email": "notexist@example.com",
+        "password": "wrongpass"
+      },
+      "expectedStatus": 400,
+      "expectedBody": { "error": "string" },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get me without token",
+      "method": "POST",
+      "path": "/",
+      "body": { "action": "me" },
+      "expectedStatus": 401,
+      "expectedBody": { "error": "string" },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,29 @@ import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+
+const AUTH_URL = "https://functions.poehali.dev/8623c31d-d2e3-497b-935a-8e72f77bc9a9";
+
+async function authFetch(action: string, data: Record<string, string> = {}, token?: string) {
+  const res = await fetch(AUTH_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { "X-Session-Token": token } : {}),
+    },
+    body: JSON.stringify({ action, ...data }),
+  });
+  return res.json();
+}
+
+interface AuthUser {
+  id: number;
+  email: string;
+  full_name: string;
+  company: string;
+  phone: string;
+  is_verified: boolean;
+}
 
 type Tab = "listings" | "favorites" | "chat" | "profile";
 
@@ -149,6 +172,113 @@ const categoryIcon: Record<string, string> = {
   materials: "Package",
   it: "Monitor",
 };
+
+// ─── Auth Modal ──────────────────────────────────────────────────────────────
+function AuthModal({ onClose, onAuth }: { onClose: () => void; onAuth: (user: AuthUser, token: string) => void }) {
+  const [mode, setMode] = useState<"login" | "register">("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [company, setCompany] = useState("");
+  const [phone, setPhone] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const submit = async () => {
+    setError("");
+    setLoading(true);
+    const data: Record<string, string> = { email, password };
+    if (mode === "register") {
+      data.full_name = fullName;
+      data.company = company;
+      data.phone = phone;
+    }
+    const res = await authFetch(mode, data);
+    setLoading(false);
+    if (res.error) { setError(res.error); return; }
+    localStorage.setItem("session_token", res.token);
+    onAuth(res.user, res.token);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+      <div className="bg-card border rounded-lg w-full max-w-sm shadow-2xl animate-scale-in overflow-hidden">
+        <div className="bg-primary text-primary-foreground px-5 py-4 flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold text-sm">
+              {mode === "login" ? "Вход в аккаунт" : "Регистрация"}
+            </h2>
+            <p className="text-xs text-blue-300 mt-0.5">БизнесДоска</p>
+          </div>
+          <button onClick={onClose} className="text-blue-300 hover:text-white transition-colors">
+            <Icon name="X" size={18} />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-3">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded px-3 py-2 flex items-center gap-2">
+              <Icon name="AlertCircle" size={13} />
+              {error}
+            </div>
+          )}
+
+          {mode === "register" && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Полное имя *</label>
+              <Input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Иван Петров" className="text-sm h-9" />
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Email *</label>
+            <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="email@company.ru" className="text-sm h-9" />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Пароль *</label>
+            <Input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={mode === "register" ? "Минимум 6 символов" : "••••••••"} className="text-sm h-9"
+              onKeyDown={e => e.key === "Enter" && submit()} />
+          </div>
+
+          {mode === "register" && (
+            <>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Организация</label>
+                <Input value={company} onChange={e => setCompany(e.target.value)} placeholder="ООО «Название»" className="text-sm h-9" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Телефон</label>
+                <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+7 (999) 000-00-00" className="text-sm h-9" />
+              </div>
+            </>
+          )}
+
+          <Button
+            className="w-full bg-accent text-white hover:bg-blue-600 h-9 text-sm mt-1"
+            onClick={submit}
+            disabled={loading}
+          >
+            {loading ? <Icon name="Loader2" size={15} className="animate-spin" /> : (mode === "login" ? "Войти" : "Зарегистрироваться")}
+          </Button>
+
+          <p className="text-center text-xs text-muted-foreground">
+            {mode === "login" ? "Нет аккаунта?" : "Уже есть аккаунт?"}{" "}
+            <button
+              className="text-accent hover:underline font-medium"
+              onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); }}
+            >
+              {mode === "login" ? "Зарегистрироваться" : "Войти"}
+            </button>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const UNITS = ["шт", "мес", "год", "проект", "услуга", "кг", "м²", "м³", "л"];
 
@@ -439,6 +569,27 @@ export default function Index() {
   const [activeChat, setActiveChat] = useState<number | null>(null);
   const [chatInput, setChatInput] = useState("");
   const [showNewListing, setShowNewListing] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [sessionToken, setSessionToken] = useState<string>("");
+
+  useEffect(() => {
+    const token = localStorage.getItem("session_token");
+    if (token) {
+      authFetch("me", {}, token).then(res => {
+        if (!res.error) { setCurrentUser(res); setSessionToken(token); }
+        else localStorage.removeItem("session_token");
+      });
+    }
+  }, []);
+
+  const handleLogout = async () => {
+    await authFetch("logout", {}, sessionToken);
+    localStorage.removeItem("session_token");
+    setCurrentUser(null);
+    setSessionToken("");
+    setActiveTab("listings");
+  };
 
   const filteredListings = LISTINGS.filter((l) => {
     const matchCat = selectedCategory === "all" || l.category === selectedCategory;
@@ -505,14 +656,43 @@ export default function Index() {
             ))}
           </nav>
 
-          <Button
-            size="sm"
-            className="hidden md:flex items-center gap-1.5 bg-accent text-white hover:bg-blue-500 text-xs h-8 px-3"
-            onClick={() => setShowNewListing(true)}
-          >
-            <Icon name="Plus" size={13} />
-            Разместить
-          </Button>
+          <div className="hidden md:flex items-center gap-2">
+            {currentUser ? (
+              <>
+                <Button
+                  size="sm"
+                  className="bg-accent text-white hover:bg-blue-500 text-xs h-8 px-3 gap-1.5"
+                  onClick={() => setShowNewListing(true)}
+                >
+                  <Icon name="Plus" size={13} />
+                  Разместить
+                </Button>
+                <div className="flex items-center gap-2 pl-2 border-l border-blue-700">
+                  <div className="w-7 h-7 rounded-full bg-accent flex items-center justify-center text-white text-xs font-bold">
+                    {currentUser.full_name.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="text-xs text-blue-200 max-w-[120px] truncate">{currentUser.full_name}</span>
+                  <button
+                    onClick={handleLogout}
+                    className="text-blue-300 hover:text-white transition-colors ml-1"
+                    title="Выйти"
+                  >
+                    <Icon name="LogOut" size={14} />
+                  </button>
+                </div>
+              </>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-blue-600 text-blue-200 hover:bg-blue-800 hover:text-white bg-transparent text-xs h-8 px-3 gap-1.5"
+                onClick={() => setShowAuth(true)}
+              >
+                <Icon name="LogIn" size={13} />
+                Войти
+              </Button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -960,22 +1140,34 @@ export default function Index() {
           <div className="animate-fade-in max-w-2xl space-y-4">
             <h2 className="text-base font-semibold">Личный кабинет</h2>
 
+            {!currentUser ? (
+              <div className="bg-card border rounded p-10 text-center space-y-3">
+                <Icon name="UserCircle" size={40} className="text-muted-foreground mx-auto" />
+                <p className="text-sm text-muted-foreground">Войдите, чтобы получить доступ к личному кабинету</p>
+                <Button className="bg-accent text-white hover:bg-blue-600 gap-1.5" onClick={() => setShowAuth(true)}>
+                  <Icon name="LogIn" size={14} />
+                  Войти или зарегистрироваться
+                </Button>
+              </div>
+            ) : (
+            <div className="space-y-4">
             <div className="bg-card border rounded p-5">
               <div className="flex items-center gap-4 mb-4">
                 <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold text-xl">
-                  АК
+                  {currentUser.full_name.charAt(0).toUpperCase()}
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-semibold text-base">Алексей Кузнецов</h3>
-                  <p className="text-sm text-muted-foreground">aleksey@company.ru</p>
+                  <h3 className="font-semibold text-base">{currentUser.full_name}</h3>
+                  <p className="text-sm text-muted-foreground">{currentUser.email}</p>
+                  {currentUser.company && <p className="text-xs text-muted-foreground">{currentUser.company}</p>}
                   <div className="flex items-center gap-1 mt-0.5">
                     <Icon name="BadgeCheck" size={12} className="text-emerald-600" />
-                    <span className="text-xs text-emerald-600 font-medium">Верифицирован</span>
+                    <span className="text-xs text-emerald-600 font-medium">Аккаунт создан</span>
                   </div>
                 </div>
-                <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5">
-                  <Icon name="Pencil" size={12} />
-                  Редактировать
+                <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={handleLogout}>
+                  <Icon name="LogOut" size={12} />
+                  Выйти
                 </Button>
               </div>
 
@@ -1056,9 +1248,18 @@ export default function Index() {
                 </button>
               ))}
             </div>
+            </div>)}
           </div>
         )}
       </main>
+
+      {/* Auth modal */}
+      {showAuth && (
+        <AuthModal
+          onClose={() => setShowAuth(false)}
+          onAuth={(user, token) => { setCurrentUser(user); setSessionToken(token); }}
+        />
+      )}
 
       {/* New listing modal */}
       {showNewListing && (
