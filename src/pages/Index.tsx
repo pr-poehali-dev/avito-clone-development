@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Icon from "@/components/ui/icon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 
 type Tab = "listings" | "favorites" | "chat" | "profile";
 
@@ -149,6 +150,284 @@ const categoryIcon: Record<string, string> = {
   it: "Monitor",
 };
 
+const UNITS = ["шт", "мес", "год", "проект", "услуга", "кг", "м²", "м³", "л"];
+
+interface NewListing {
+  title: string;
+  category: string;
+  city: string;
+  price: string;
+  unit: string;
+  desc: string;
+  contact: string;
+  photos: string[];
+}
+
+const EMPTY_FORM: NewListing = {
+  title: "",
+  category: "realty",
+  city: "",
+  price: "",
+  unit: "шт",
+  desc: "",
+  contact: "",
+  photos: [],
+};
+
+function NewListingModal({
+  onClose,
+  onSubmit,
+}: {
+  onClose: () => void;
+  onSubmit: (data: NewListing) => void;
+}) {
+  const [form, setForm] = useState<NewListing>(EMPTY_FORM);
+  const [step, setStep] = useState<1 | 2>(1);
+  const [submitted, setSubmitted] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const set = (key: keyof NewListing, val: string) =>
+    setForm((f) => ({ ...f, [key]: val }));
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    const previews = files.map((f) => URL.createObjectURL(f));
+    setForm((prev) => ({ ...prev, photos: [...prev.photos, ...previews].slice(0, 5) }));
+  };
+
+  const removePhoto = (idx: number) =>
+    setForm((f) => ({ ...f, photos: f.photos.filter((_, i) => i !== idx) }));
+
+  const canNext =
+    form.title.trim() && form.category && form.city.trim() && form.price.trim();
+
+  const handleSubmit = () => {
+    setSubmitted(true);
+    setTimeout(() => onSubmit(form), 1400);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+      <div className="bg-card border rounded-lg w-full max-w-xl shadow-2xl animate-scale-in overflow-hidden">
+        {/* Header */}
+        <div className="bg-primary text-primary-foreground px-5 py-4 flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold text-sm">Новое объявление</h2>
+            <p className="text-xs text-blue-300 mt-0.5">Шаг {step} из 2</p>
+          </div>
+          <button onClick={onClose} className="text-blue-300 hover:text-white transition-colors">
+            <Icon name="X" size={18} />
+          </button>
+        </div>
+
+        {/* Progress bar */}
+        <div className="h-0.5 bg-blue-900">
+          <div
+            className="h-full bg-accent transition-all duration-300"
+            style={{ width: step === 1 ? "50%" : "100%" }}
+          />
+        </div>
+
+        {submitted ? (
+          <div className="p-12 text-center space-y-3 animate-fade-in">
+            <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center mx-auto">
+              <Icon name="CheckCircle" size={28} className="text-emerald-600" />
+            </div>
+            <h3 className="font-semibold">Объявление отправлено на модерацию</h3>
+            <p className="text-sm text-muted-foreground">Обычно проверка занимает до 2 часов</p>
+          </div>
+        ) : step === 1 ? (
+          <div className="p-5 space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Заголовок объявления *
+              </label>
+              <Input
+                value={form.title}
+                onChange={(e) => set("title", e.target.value)}
+                placeholder="Например: Аренда склада 500 м²"
+                className="text-sm"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Категория *
+                </label>
+                <div className="grid grid-cols-1 gap-0.5 border rounded overflow-hidden">
+                  {CATEGORIES.filter((c) => c.id !== "all").map((cat) => (
+                    <button
+                      key={cat.id}
+                      onClick={() => set("category", cat.id)}
+                      className={`px-3 py-1.5 text-sm text-left transition-colors ${
+                        form.category === cat.id
+                          ? "bg-accent text-white"
+                          : "hover:bg-muted text-foreground"
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Город *
+                  </label>
+                  <div className="grid grid-cols-1 gap-0.5 border rounded overflow-hidden">
+                    {CITIES.map((city) => (
+                      <button
+                        key={city}
+                        onClick={() => set("city", city)}
+                        className={`px-3 py-1.5 text-sm text-left transition-colors ${
+                          form.city === city
+                            ? "bg-accent text-white"
+                            : "hover:bg-muted text-foreground"
+                        }`}
+                      >
+                        {city}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Цена (₽) *
+                </label>
+                <Input
+                  type="number"
+                  value={form.price}
+                  onChange={(e) => set("price", e.target.value)}
+                  placeholder="0"
+                  className="text-sm font-mono"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Единица
+                </label>
+                <div className="flex flex-wrap gap-1">
+                  {UNITS.map((u) => (
+                    <button
+                      key={u}
+                      onClick={() => set("unit", u)}
+                      className={`px-2 py-1 text-xs rounded border transition-colors ${
+                        form.unit === u
+                          ? "bg-accent text-white border-accent"
+                          : "border-border hover:bg-muted"
+                      }`}
+                    >
+                      {u}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <Button
+                className="bg-accent text-white hover:bg-blue-600 gap-1.5"
+                disabled={!canNext}
+                onClick={() => setStep(2)}
+              >
+                Далее
+                <Icon name="ArrowRight" size={14} />
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="p-5 space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Описание
+              </label>
+              <Textarea
+                value={form.desc}
+                onChange={(e) => set("desc", e.target.value)}
+                placeholder="Подробно опишите товар или услугу, укажите характеристики, условия..."
+                className="text-sm resize-none h-28"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Контактное лицо / организация
+              </label>
+              <Input
+                value={form.contact}
+                onChange={(e) => set("contact", e.target.value)}
+                placeholder="ООО «Название» или ФИО"
+                className="text-sm"
+              />
+            </div>
+
+            {/* Photo upload */}
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Фотографии (до 5)
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {form.photos.map((src, idx) => (
+                  <div key={idx} className="relative w-20 h-20 rounded border overflow-hidden group">
+                    <img src={src} alt="" className="w-full h-full object-cover" />
+                    <button
+                      onClick={() => removePhoto(idx)}
+                      className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                    >
+                      <Icon name="X" size={16} className="text-white" />
+                    </button>
+                  </div>
+                ))}
+                {form.photos.length < 5 && (
+                  <button
+                    onClick={() => fileRef.current?.click()}
+                    className="w-20 h-20 rounded border-2 border-dashed border-border hover:border-accent transition-colors flex flex-col items-center justify-center gap-1 text-muted-foreground hover:text-accent"
+                  >
+                    <Icon name="ImagePlus" size={20} />
+                    <span className="text-xs">Фото</span>
+                  </button>
+                )}
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={handleFile}
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center pt-1">
+              <button
+                onClick={() => setStep(1)}
+                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Icon name="ArrowLeft" size={14} />
+                Назад
+              </button>
+              <Button
+                className="bg-accent text-white hover:bg-blue-600 gap-1.5"
+                onClick={handleSubmit}
+              >
+                <Icon name="Send" size={14} />
+                Опубликовать
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Index() {
   const [activeTab, setActiveTab] = useState<Tab>("listings");
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -159,6 +438,7 @@ export default function Index() {
   const [favorites, setFavorites] = useState<number[]>([1, 3]);
   const [activeChat, setActiveChat] = useState<number | null>(null);
   const [chatInput, setChatInput] = useState("");
+  const [showNewListing, setShowNewListing] = useState(false);
 
   const filteredListings = LISTINGS.filter((l) => {
     const matchCat = selectedCategory === "all" || l.category === selectedCategory;
@@ -228,6 +508,7 @@ export default function Index() {
           <Button
             size="sm"
             className="hidden md:flex items-center gap-1.5 bg-accent text-white hover:bg-blue-500 text-xs h-8 px-3"
+            onClick={() => setShowNewListing(true)}
           >
             <Icon name="Plus" size={13} />
             Разместить
@@ -360,7 +641,10 @@ export default function Index() {
                     className="pl-8 text-sm bg-card h-9"
                   />
                 </div>
-                <Button className="bg-accent text-white hover:bg-blue-600 h-9 text-sm px-3 gap-1.5">
+                <Button
+                  className="bg-accent text-white hover:bg-blue-600 h-9 text-sm px-3 gap-1.5"
+                  onClick={() => setShowNewListing(true)}
+                >
                   <Icon name="Plus" size={14} />
                   Разместить
                 </Button>
@@ -716,7 +1000,11 @@ export default function Index() {
                 <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                   Мои объявления
                 </h3>
-                <Button size="sm" className="h-7 text-xs bg-accent text-white hover:bg-blue-600 gap-1">
+                <Button
+                  size="sm"
+                  className="h-7 text-xs bg-accent text-white hover:bg-blue-600 gap-1"
+                  onClick={() => setShowNewListing(true)}
+                >
                   <Icon name="Plus" size={12} />
                   Новое
                 </Button>
@@ -771,6 +1059,16 @@ export default function Index() {
           </div>
         )}
       </main>
+
+      {/* New listing modal */}
+      {showNewListing && (
+        <NewListingModal
+          onClose={() => setShowNewListing(false)}
+          onSubmit={() => {
+            setTimeout(() => setShowNewListing(false), 1800);
+          }}
+        />
+      )}
 
       {/* Mobile bottom nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t flex z-50">
